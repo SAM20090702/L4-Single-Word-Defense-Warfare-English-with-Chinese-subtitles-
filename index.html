@@ -5,6 +5,14 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
     <title>單字防衛戰！巨無霸單字版</title>
     <style>
+/* 加入這段手機版適配代碼 */
+        @media screen and (max-width: 600px) {
+            #word-drop { font-size: 5rem !important; }
+            #penguin-container { width: 120px !important; height: 120px !important; transform: scale(0.7); }
+            #game-stage { height: 45vh !important; }
+            #answer-zone { height: 45vh !important; padding: 5px !important; gap: 5px !important; }
+            .btn { padding: 8px !important; font-size: 1.3rem !important; }
+        }
         * {
             box-sizing: border-box;
             user-select: none;
@@ -61,15 +69,17 @@
             position: absolute;
             width: 100%;
             text-align: center;
-            font-size: 10rem; /* 從 3.6rem 放大至 10rem！ */
+            font-size: 10rem;
             font-weight: bold;
             color: #00ffff;
             text-shadow: 0 0 20px #00ffff, 0 0 40px #00ffff;
-            top: -160px; /* 因字體極大，初始隱藏位置調高 */
-            transition: top 0.05s linear;
+            top: -160px;
+            /* --- 關鍵修改：刪除 transition，防止瀏覽器嘗試做過渡動畫 --- */
+            transition: none !important; 
             z-index: 2;
-            letter-spacing: -2px; /* 稍微緊縮字母間距防止手機爆行 */
+            letter-spacing: -2px;
             word-break: break-all;
+            white-space: nowrap; /* 確保字不換行 */
         }
 
         /* 🐧 3倍大巨型守護企鵝波波 */
@@ -203,6 +213,14 @@
             font-weight: bold;
             box-shadow: 0 0 25px rgba(255,0,85,0.6);
             cursor: pointer;
+        }
+                /* 加入這段手機版適配代碼 */
+        @media screen and (max-width: 600px) {
+            #word-drop { font-size: 5rem !important; }
+            #penguin-container { width: 120px !important; height: 120px !important; transform: scale(0.7); }
+            #game-stage { height: 45vh !important; }
+            #answer-zone { height: 45vh !important; padding: 5px !important; gap: 5px !important; }
+            .btn { padding: 8px !important; font-size: 1.3rem !important; }
         }
     </style>
 </head>
@@ -469,13 +487,14 @@
             isAnswering = false;
             for(let i=0; i<3; i++) {
                 document.getElementById(`btn${i}`).className = 'btn';
-            }
-            
+            } // 這裡要有對應 for 的閉合括號
+
             const randomIndex = Math.floor(Math.random() * wordList.length);
             currentWord = wordList[randomIndex];
             wordEl.innerText = currentWord.en;
             wordEl.style.color = '#00ffff';
-            
+    
+            // 您新增的修正
             wordPos = -160; 
             wordEl.style.top = wordPos + 'px';
 
@@ -496,7 +515,7 @@
                 btn.innerText = options[i];
                 btn.dataset.correct = (options[i] === currentWord.zh);
             }
-        }
+        } // 這是函數 nextWord 的結尾，這之後不應該還有多餘的 } 
 
         function updateGame() {
             const stageHeight = document.getElementById('game-stage').clientHeight;
