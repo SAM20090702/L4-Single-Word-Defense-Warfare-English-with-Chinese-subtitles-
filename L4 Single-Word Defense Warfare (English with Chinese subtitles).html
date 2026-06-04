@@ -1,0 +1,582 @@
+<!DOCTYPE html>
+<html lang="zh-TW">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>單字防衛戰！巨無霸單字版</title>
+    <style>
+        * {
+            box-sizing: border-box;
+            user-select: none;
+            -webkit-user-select: none;
+        }
+        body {
+            margin: 0;
+            padding: 0;
+            background: #0f0f12;
+            font-family: 'Arial', sans-serif;
+            color: white;
+            overflow: hidden;
+            display: flex;
+            flex-direction: column;
+            height: 100vh;
+        }
+        /* 計分板 */
+        #score-board {
+            height: 11vh;
+            display: flex;
+            justify-content: space-around;
+            align-items: center;
+            background: #17171c;
+            font-size: 1.4rem;
+            font-weight: bold;
+            border-bottom: 4px solid #ff0055;
+            box-shadow: 0 0 15px rgba(255, 0, 85, 0.3);
+        }
+        #score { color: #39ff14; text-shadow: 0 0 5px #39ff14; }
+        #combo { color: #ff9f00; text-shadow: 0 0 5px #ff9f00; }
+        #timer { color: #00ffff; text-shadow: 0 0 5px #00ffff; }
+        
+        #mute-btn {
+            background: #252530;
+            border: 2px solid #ff0055;
+            color: white;
+            padding: 6px 14px;
+            border-radius: 20px;
+            font-size: 1rem;
+            cursor: pointer;
+            font-weight: bold;
+        }
+
+        /* 遊戲舞台 */
+        #game-stage {
+            height: 54vh;
+            position: relative;
+            background: linear-gradient(to bottom, #10101c, #1a052e);
+            overflow: hidden;
+        }
+        
+        /* 🔤 巨無霸英文單字 (放大3倍) */
+        #word-drop {
+            position: absolute;
+            width: 100%;
+            text-align: center;
+            font-size: 10rem; /* 從 3.6rem 放大至 10rem！ */
+            font-weight: bold;
+            color: #00ffff;
+            text-shadow: 0 0 20px #00ffff, 0 0 40px #00ffff;
+            top: -160px; /* 因字體極大，初始隱藏位置調高 */
+            transition: top 0.05s linear;
+            z-index: 2;
+            letter-spacing: -2px; /* 稍微緊縮字母間距防止手機爆行 */
+            word-break: break-all;
+        }
+
+        /* 🐧 3倍大巨型守護企鵝波波 */
+        #penguin-container {
+            position: absolute;
+            bottom: 5px;
+            right: 5px;
+            width: 270px; 
+            height: 270px;
+            z-index: 5;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            transform-origin: bottom center;
+            opacity: 0.85; /* 稍微透明，避免完全遮擋到巨大的字 */
+        }
+        #penguin-bubble {
+            position: absolute;
+            top: -55px; 
+            background: white;
+            color: black;
+            border-radius: 12px;
+            padding: 8px 18px;
+            font-size: 1.4rem; 
+            font-weight: bold;
+            white-space: nowrap;
+            box-shadow: 0 6px 12px rgba(0,0,0,0.5);
+            transition: all 0.2s;
+        }
+        #penguin-bubble::after {
+            content: '';
+            position: absolute;
+            bottom: -6px;
+            left: 50%;
+            transform: translateX(-50%);
+            border-width: 6px 6px 0;
+            border-style: solid;
+            border-color: white transparent;
+            display: block;
+            width: 0;
+        }
+
+        /* 企鵝狀態控制 */
+        #penguin-container.idle .eyes-idle { display: block !important; }
+        #penguin-container.idle .eyes-happy, #penguin-container.idle .eyes-sad { display: none; }
+
+        #penguin-container.happy .eyes-happy { display: block !important; }
+        #penguin-container.happy .eyes-idle, #penguin-container.happy .eyes-sad { display: none; }
+
+        #penguin-container.sad .eyes-sad { display: block !important; }
+        #penguin-container.sad .eyes-idle, #penguin-container.sad .eyes-happy { display: none; }
+
+        /* 企鵝動態 Keyframes */
+        @keyframes bobbing {
+            0%, 100% { transform: translateY(0); }
+            50% { transform: translateY(-10px); }
+        }
+        @keyframes bounce-happy {
+            0%, 100% { transform: translateY(0) scale(1); }
+            30% { transform: translateY(-35px) scale(1.1, 0.9); }
+            60% { transform: translateY(5px) scale(0.9, 1.1); }
+        }
+        @keyframes shake-sad {
+            0%, 100% { transform: translateX(0); }
+            20%, 60% { transform: translateX(-10px) rotate(-4deg); }
+            40%, 80% { transform: translateX(10px) rotate(4deg); }
+        }
+        @keyframes tear-fall {
+            0% { transform: translateY(0); opacity: 1; }
+            100% { transform: translateY(25px); opacity: 0; }
+        }
+        .tear-drop {
+            animation: tear-fall 0.5s infinite linear;
+        }
+
+        /* 答案按鈕區 */
+        #answer-zone {
+            height: 35vh;
+            background: #17171c;
+            display: flex;
+            flex-direction: column;
+            justify-content: space-evenly;
+            padding: 10px 14px;
+            border-top: 4px solid #00ffff;
+            box-shadow: 0 0 15px rgba(0, 255, 255, 0.2);
+        }
+        .btn {
+            width: 100%;
+            padding: 14px; 
+            font-size: 1.7rem; 
+            font-weight: bold;
+            color: white;
+            background: #222230;
+            border: 2px solid #444460;
+            border-radius: 16px;
+            text-align: center;
+            box-shadow: 0 5px 0 #11111a;
+            cursor: pointer;
+            transition: background 0.1s;
+        }
+        .btn:active {
+            transform: translateY(3px);
+            box-shadow: 0 2px 0 #11111a;
+        }
+        
+        .correct { background: #00cc44 !important; border-color: #39ff14 !important; box-shadow: 0 0 15px #39ff14 !important;}
+        .wrong { background: #cc0033 !important; border-color: #ff0055 !important; box-shadow: 0 0 15px #ff0055 !important;}
+        
+        /* 遮罩面板 */
+        .overlay {
+            position: absolute;
+            top: 0; left: 0; width: 100%; height: 100%;
+            background: rgba(10, 10, 15, 0.98);
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+            align-items: center;
+            z-index: 10;
+        }
+        .overlay h1 { font-size: 2.4rem !important; }
+        .overlay h3 { font-size: 1.4rem !important; }
+        .overlay p { font-size: 1.2rem !important; }
+        
+        .start-btn {
+            padding: 16px 50px;
+            font-size: 1.8rem;
+            background: linear-gradient(45deg, #00ffff, #ff0055);
+            color: white;
+            border: none;
+            border-radius: 40px;
+            font-weight: bold;
+            box-shadow: 0 0 25px rgba(255,0,85,0.6);
+            cursor: pointer;
+        }
+    </style>
+</head>
+<body>
+
+    <div id="score-board">
+        <div>得分: <span id="score">0</span></div>
+        <div>連擊: <span id="combo">0</span></div>
+        <div>時間: <span id="timer">0</span>秒</div>
+        <button id="mute-btn" onclick="toggleMute()">🔊 聲音：開</button>
+    </div>
+
+    <div id="game-stage">
+        <div id="word-drop">READY</div>
+        
+        <div id="penguin-container" class="idle">
+            <div id="penguin-bubble">加油！</div>
+            <svg width="100%" height="100%" viewBox="0 0 100 100">
+                <ellipse cx="33" cy="88" rx="12" ry="6" fill="#ffaa00"/>
+                <ellipse cx="67" cy="88" rx="12" ry="6" fill="#ffaa00"/>
+                <ellipse cx="14" cy="55" rx="7" ry="16" fill="#2b2b36" transform="rotate(15 14 55)"/>
+                <ellipse cx="86" cy="55" rx="7" ry="16" fill="#2b2b36" transform="rotate(-15 86 55)"/>
+                <rect x="18" y="22" width="64" height="66" rx="32" fill="#2b2b36" />
+                <ellipse cx="50" cy="59" rx="23" ry="24" fill="#ffffff"/>
+                
+                <g id="penguin-faces">
+                    <g class="eyes-idle">
+                        <circle cx="38" cy="40" r="4.5" fill="#000"/>
+                        <circle cx="39" cy="38" r="1.5" fill="#fff"/>
+                        <circle cx="62" cy="40" r="4.5" fill="#000"/>
+                        <circle cx="63" cy="38" r="1.5" fill="#fff"/>
+                    </g>
+                    <g class="eyes-happy">
+                        <path d="M32,41 Q38,34 44,41" stroke="#000" stroke-width="3.5" fill="none" stroke-linecap="round"/>
+                        <path d="M56,41 Q62,34 68,41" stroke="#000" stroke-width="3.5" fill="none" stroke-linecap="round"/>
+                        <circle cx="34" cy="48" r="4" fill="#ff4466" opacity="0.6"/>
+                        <circle cx="66" cy="48" r="4" fill="#ff4466" opacity="0.6"/>
+                    </g>
+                    <g class="eyes-sad">
+                        <path d="M32,37 Q38,44 44,37" stroke="#000" stroke-width="3.5" fill="none" stroke-linecap="round"/>
+                        <path d="M56,37 Q62,44 68,37" stroke="#000" stroke-width="3.5" fill="none" stroke-linecap="round"/>
+                        <path class="tear-drop" d="M36,44 Q38,52 35,52 Q32,52 33,44 Z" fill="#00bfff"/>
+                        <path class="tear-drop" d="M62,44 Q64,52 61,52 Q58,52 59,44 Z" fill="#00bfff"/>
+                    </g>
+                    <polygon points="44,45 56,45 50,54" fill="#ffaa00"/>
+                </g>
+            </svg>
+        </div>
+        
+        <div id="start-overlay" class="overlay">
+            <h1 style="color: #00ffff; text-shadow: 0 0 10px #00ffff; margin-bottom: 5px;">單字防衛戰！</h1>
+            <h3 style="color: #ff0055; margin-bottom: 25px;">⚡ 巨無霸單字狂飆特訓版 ⚡</h3>
+            <p style="color: #aaa; text-align: center; margin-bottom: 25px; padding: 0 20px; line-height: 1.8;">
+                單字變得超級無敵大！連擊分數瘋狂加倍！<br>
+                目標挑戰 <span style="color:#39ff14; font-weight:bold;">500 分</span> 通關，加油！
+            </p>
+            <button class="start-btn" onclick="initAudioAndStart()">點擊開戰</button>
+        </div>
+
+        <div id="end-overlay" class="overlay" style="display: none;">
+            <h1 style="color: #39ff14; text-shadow: 0 0 15px #39ff14; margin-bottom: 10px;">🏆 恭喜挑戰成功！</h1>
+            <p style="font-size: 1.6rem; margin: 10px 0;">最終得分: <span id="final-score" style="color:#00ffff; font-weight:bold;">0</span></p>
+            <p style="font-size: 1.6rem; margin: 10px 0; color: #ff9f00;">總共花費時間: <span id="final-time" style="font-weight:bold; color: #ff9f00;">0</span> 秒</p>
+            <button class="start-btn" onclick="startGame()">再戰一局</button>
+        </div>
+    </div>
+
+    <div id="answer-zone">
+        <button class="btn" onclick="checkAnswer(0)" id="btn0">選項 1</button>
+        <button class="btn" onclick="checkAnswer(1)" id="btn1">選項 2</button>
+        <button class="btn" onclick="checkAnswer(2)" id="btn2">選項 3</button>
+    </div>
+
+    <script>
+        const wordList = [
+            { en: 'tragedy', zh: '悲劇、災難' },
+            { en: 'tragic', zh: '悲慘的' },
+            { en: 'upset', zh: '生氣的、心煩的' },
+            { en: 'delete', zh: '刪除' },
+            { en: 'cruel', zh: '殘忍的' },
+            { en: 'offensive', zh: '冒犯的' },
+            { en: 'punish', zh: '處罰 (動詞)' },
+            { en: 'punishment', zh: '處罰 (名詞)' },
+            { en: 'victim', zh: '受害者' },
+            { en: 'rumor', zh: '謠言' },
+            { en: 'target', zh: '目標' },
+            { en: 'identity', zh: '身分' }
+        ];
+
+        let score = 0;
+        let combo = 0;
+        let seconds = 0; 
+        let currentWord = {};
+        let gameInterval;
+        let bgmTimeout;
+        let timerInterval; 
+        let wordPos = -160; // 配合超大字體調高初始位置
+        let speed = 0.5; 
+        let isAnswering = false;
+        let isGameRunning = false;
+        
+        let audioCtx = null;
+        let isMuted = false;
+        let bgmStep = 0;
+        const bgmNotes = [146.83, 164.81, 174.61, 207.65, 220.00, 207.65, 174.61, 164.81]; 
+        let currentBpmSpeed = 220; 
+
+        const wordEl = document.getElementById('word-drop');
+        const scoreEl = document.getElementById('score');
+        const comboEl = document.getElementById('combo');
+        const timerEl = document.getElementById('timer');
+        const startOverlay = document.getElementById('start-overlay');
+        const endOverlay = document.getElementById('end-overlay');
+        const muteBtn = document.getElementById('mute-btn');
+        
+        const penguinContainer = document.getElementById('penguin-container');
+        const penguinBubble = document.getElementById('penguin-bubble');
+
+        function initAudioAndStart() {
+            if (!audioCtx) {
+                audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+            } else if (audioCtx.state === 'suspended') {
+                audioCtx.resume();
+            }
+            startGame();
+        }
+
+        function speakWord(text) {
+            if (isMuted) return;
+            try {
+                window.speechSynthesis.cancel();
+                const utterance = new SpeechSynthesisUtterance(text);
+                utterance.lang = 'en-US'; 
+                utterance.rate = 0.8;    
+                window.speechSynthesis.speak(utterance);
+            } catch(e) { console.log("語音發音失敗:", e); }
+        }
+
+        function setPenguinMood(mood) {
+            penguinContainer.className = mood;
+            
+            const happyTexts = ["得分狂飆！", "太厲害了！", "連續答對！", "🌟 分數大放送！", "波波好崇拜你！"];
+            const sadTexts = ["別灰心！", "下一題加把勁", "分數斷掉了QQ", "再試一次", "拍拍你～"];
+            const idleTexts = ["加油！", "字超大，看得很清楚！", "衝啊！挑戰500分！", "你可以的！"];
+
+            if (mood === 'happy') {
+                penguinContainer.style.animation = 'none';
+                penguinContainer.offsetHeight; 
+                penguinContainer.style.animation = 'bounce-happy 0.6s ease-in-out';
+                penguinBubble.innerText = happyTexts[Math.floor(Math.random() * happyTexts.length)];
+            } else if (mood === 'sad') {
+                penguinContainer.style.animation = 'none';
+                penguinContainer.offsetHeight; 
+                penguinContainer.style.animation = 'shake-sad 0.5s ease-in-out';
+                penguinBubble.innerText = sadTexts[Math.floor(Math.random() * sadTexts.length)];
+            } else {
+                penguinContainer.style.animation = 'bobbing 2s infinite ease-in-out';
+                if (Math.random() < 0.4) {
+                    penguinBubble.innerText = idleTexts[Math.floor(Math.random() * idleTexts.length)];
+                }
+            }
+        }
+
+        function playTone(freq, type, duration, volume = 0.1, slideTo = 0) {
+            if (isMuted || !audioCtx) return;
+            try {
+                const oscillator = audioCtx.createOscillator();
+                const gainNode = audioCtx.createGain();
+                oscillator.type = type;
+                oscillator.frequency.setValueAtTime(freq, audioCtx.currentTime);
+                if (slideTo > 0) {
+                    oscillator.frequency.exponentialRampToValueAtTime(slideTo, audioCtx.currentTime + duration);
+                }
+                gainNode.gain.setValueAtTime(volume, audioCtx.currentTime);
+                gainNode.gain.linearRampToValueAtTime(0.001, audioCtx.currentTime + duration);
+                oscillator.connect(gainNode);
+                gainNode.connect(audioCtx.destination);
+                oscillator.start();
+                oscillator.stop(audioCtx.currentTime + duration);
+            } catch(e) { console.log(e); }
+        }
+
+        function playCorrectSound() {
+            playTone(523.25, 'sine', 0.08, 0.12); 
+            setTimeout(() => playTone(659.25, 'sine', 0.08, 0.12), 50); 
+            setTimeout(() => playTone(783.99, 'sine', 0.08, 0.12), 100); 
+            setTimeout(() => playTone(1046.50, 'sine', 0.15, 0.15), 150); 
+        }
+
+        function playWrongSound() {
+            playTone(293.66, 'sawtooth', 0.4, 0.15, 70.00); 
+        }
+
+        function playWinSound() {
+            let tempo = 120;
+            const winMelody = [523.25, 523.25, 523.25, 523.25, 659.25, 587.33, 659.25, 783.99, 1046.50];
+            winMelody.forEach((f, i) => {
+                setTimeout(() => playTone(f, 'triangle', 0.2, 0.12), i * tempo);
+            });
+        }
+
+        function playBgmNextNote() {
+            if (!isGameRunning) return;
+            if (!isMuted && !isAnswering) {
+                let note = bgmNotes[bgmStep % bgmNotes.length];
+                let vol = (bgmStep % 4 === 0) ? 0.05 : 0.03;
+                let type = (bgmStep % 4 === 0) ? 'sawtooth' : 'triangle';
+                playTone(note, type, currentBpmSpeed / 1000 * 0.9, vol);
+                bgmStep++;
+            }
+            currentBpmSpeed = Math.max(120, 240 - (speed * 25)); 
+            bgmTimeout = setTimeout(playBgmNextNote, currentBpmSpeed);
+        }
+
+        function toggleMute() {
+            isMuted = !isMuted;
+            if (isMuted) {
+                muteBtn.innerText = "📁 聲音：關";
+                muteBtn.style.background = "#5a2233";
+                window.speechSynthesis.cancel(); 
+            } else {
+                muteBtn.innerText = "🔊 聲音：開";
+                muteBtn.style.background = "#252530";
+                if(audioCtx && audioCtx.state === 'suspended') audioCtx.resume();
+                speakWord(currentWord.en); 
+            }
+        }
+
+        function startGame() {
+            score = 0;
+            combo = 0;
+            seconds = 0;
+            speed = 0.5; 
+            currentBpmSpeed = 220;
+            bgmStep = 0;
+            isGameRunning = true;
+            
+            scoreEl.innerText = score;
+            comboEl.innerText = combo;
+            timerEl.innerText = seconds;
+            startOverlay.style.display = 'none';
+            endOverlay.style.display = 'none';
+            
+            setPenguinMood('idle');
+            nextWord();
+            
+            clearInterval(gameInterval);
+            gameInterval = setInterval(updateGame, 20);
+            
+            clearTimeout(bgmTimeout);
+            playBgmNextNote();
+
+            clearInterval(timerInterval);
+            timerInterval = setInterval(() => {
+                if (isGameRunning) {
+                    seconds++;
+                    timerEl.innerText = seconds;
+                }
+            }, 1000);
+        }
+
+        function nextWord() {
+            if (!isGameRunning) return;
+            isAnswering = false;
+            for(let i=0; i<3; i++) {
+                document.getElementById(`btn${i}`).className = 'btn';
+            }
+            
+            const randomIndex = Math.floor(Math.random() * wordList.length);
+            currentWord = wordList[randomIndex];
+            wordEl.innerText = currentWord.en;
+            wordEl.style.color = '#00ffff';
+            
+            wordPos = -160; 
+            wordEl.style.top = wordPos + 'px';
+
+            speakWord(currentWord.en);
+            setPenguinMood('idle'); 
+
+            let options = [currentWord.zh];
+            while(options.length < 3) {
+                let randomWrong = wordList[Math.floor(Math.random() * wordList.length)].zh;
+                if(!options.includes(randomWrong)) {
+                    options.push(randomWrong);
+                }
+            }
+            options.sort(() => Math.random() - 0.5);
+
+            for(let i=0; i<3; i++) {
+                const btn = document.getElementById(`btn${i}`);
+                btn.innerText = options[i];
+                btn.dataset.correct = (options[i] === currentWord.zh);
+            }
+        }
+
+        function updateGame() {
+            const stageHeight = document.getElementById('game-stage').clientHeight;
+            
+            // 配合大字體稍微提高觸底判定線，留點空間給大字體
+            if (wordPos < stageHeight - 140) {
+                wordPos += speed;
+                wordEl.style.top = wordPos + 'px';
+            } else {
+                if(!isAnswering) {
+                    isAnswering = true;
+                    combo = 0;
+                    comboEl.innerText = combo;
+                    wordEl.style.color = '#ff0055';
+                    playWrongSound();
+                    setPenguinMood('sad'); 
+                    
+                    for(let i=0; i<3; i++) {
+                        let b = document.getElementById(`btn${i}`);
+                        if(b.dataset.correct === "true") b.classList.add('correct');
+                    }
+                    setTimeout(nextWord, 1200); 
+                }
+            }
+        }
+
+        function checkAnswer(btnIndex) {
+            if(isAnswering || !isGameRunning) return; 
+            isAnswering = true;
+
+            const selectedBtn = document.getElementById(`btn${btnIndex}`);
+            const isCorrect = selectedBtn.dataset.correct === "true";
+
+            if(isCorrect) {
+                selectedBtn.classList.add('correct');
+                playCorrectSound();
+                setPenguinMood('happy'); 
+                
+                // 🚀 連擊大加分演算法：基礎 20 分 + (連擊數 * 10)
+                score += (20 + combo * 10);
+                combo++;
+                scoreEl.innerText = score;
+                comboEl.innerText = combo;
+                wordEl.style.color = '#39ff14';
+                
+                if(speed < 1.8) speed += 0.05;
+
+                setTimeout(nextWord, 600); 
+            } else {
+                selectedBtn.classList.add('wrong');
+                playWrongSound();
+                setPenguinMood('sad'); 
+                
+                combo = 0;
+                comboEl.innerText = combo;
+                
+                for(let i=0; i<3; i++) {
+                    let b = document.getElementById(`btn${i}`);
+                    if(b.dataset.correct === "true") b.classList.add('correct');
+                }
+                
+                setTimeout(nextWord, 1500); 
+            }
+
+            // 🏆 通關目標改為 500 分，體驗分數狂飆
+            if (score >= 500) {
+                isGameRunning = false;
+                clearInterval(gameInterval);
+                clearInterval(timerInterval); 
+                clearTimeout(bgmTimeout);
+                window.speechSynthesis.cancel(); 
+                
+                setTimeout(() => {
+                    playWinSound();
+                    document.getElementById('final-score').innerText = score;
+                    document.getElementById('final-time').innerText = seconds; 
+                    endOverlay.style.display = 'flex';
+                }, 300);
+            }
+        }
+    </script>
+</body>
+</html>
